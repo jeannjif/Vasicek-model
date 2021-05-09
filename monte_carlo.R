@@ -1,4 +1,4 @@
-taux_ZC <- function(s = 5, Tz =10,N = 10, T = 5, n = 60){#price of zeros a zeros coupon bond following Vasicek model.
+taux_ZC <- function(s = 5, Tz =10,N = 10000, T = 5, n = 60){#price of zeros a zeros coupon bond following Vasicek model.
   #Tz = maturity of zeros coupon
   ##-----------Evaluate free_rate
   delta_t <- T/n
@@ -20,7 +20,12 @@ taux_ZC <- function(s = 5, Tz =10,N = 10, T = 5, n = 60){#price of zeros a zeros
   A_ts <- exp((theta - (sig^2)/(2*a^2))*(B_ts - 10) - ((sig^2)/(4*a))*B_ts^2)
   for(y in seq(1,s)){
     P_ts[y,] <- A_ts*exp(-B_ts*r[t,])
-    t <- t+ (n/T)                     
+    if(y<=T){
+      t <- t+ (n/T)
+    }
+    else{
+      stop("S must be less than T")
+    }                   
   }
   new_list <- list(rate = r, taux_zc = -log(P_ts)/Tz) #access by doing: price_ZC$price or rate
   return(new_list)
@@ -50,7 +55,7 @@ actualisation <- function(s,rate){ #evaluate /beta with simpson. Please note tha
 
 ############################################################"""
 floating_coupon <- function(coupon,rat,T = 5,n=60){#evaluate floating coupon bond by
-                                                   #Monte carlo
+  #Monte carlo
   K_s <- matrix(NA, nrow = nrow(coupon), ncol = ncol(rat))
   
   #------------evaluate cashflow---------
@@ -76,8 +81,8 @@ floating_coupon <- function(coupon,rat,T = 5,n=60){#evaluate floating coupon bon
   price <- mean(payoff)*1
   S <- sd(payoff)
   #----building confidence interval: TODO: ask if it's good
-  l <- price - qnorm(0.975)*S/sqrt(ncol = ncol(rat))
-  h <- price + qnorm(0.975)*S/sqrt(ncol = ncol(rat))
+  l <- price - qnorm(0.975)*S/sqrt(ncol(rat))
+  h <- price + qnorm(0.975)*S/sqrt(ncol(rat))
   inter <- c(h,l)
   new_list <- list(Ks = K_s, pri = price, IC = inter)
   return(new_list)
@@ -85,15 +90,16 @@ floating_coupon <- function(coupon,rat,T = 5,n=60){#evaluate floating coupon bon
 
 ##############partie B
 
-prix_zc_mc <- function(rate, Tz = 5){#Compare price of zero coupon evaluate by monte carlo vs vasicek
-                              # Tz = maturity of zero coupon in year
-  t <- ((nrow(rate)-1)/Tz) +1
+prix_zc_mc <- function(rate, Tz = 5,T = 4){#Compare price of zero coupon evaluate by monte carlo vs vasicek
+  # Tz = maturity of zero coupon in year
+  #T = horizon of rate
+  t <- ((nrow(rate)-1)/T) +1
   if (Tz>1){
     for(i in seq(2,Tz)){
-      t<- t+ ((nrow(rate)-1)/Tz)
+      t<- t+ ((nrow(rate)-1)/T)
     }
   }
-    P_0T <- actualisation(Tz,rate[1:t,])
+  P_0T <- actualisation(Tz,rate[1:t,])
   ###-----evaluate zeros coupon-----
   a <- 0.2
   theta <- 0.04
@@ -101,8 +107,8 @@ prix_zc_mc <- function(rate, Tz = 5){#Compare price of zero coupon evaluate by m
   B_ts <- (1-exp(-a*Tz))/a # move outside, also A_ts
   A_ts <- exp((theta - (sig^2)/(2*a^2))*(B_ts - Tz) - ((sig^2)/(4*a))*B_ts^2)
   P_ts <- A_ts*exp(-B_ts*rate[1,])
-  valu <- list(sim = mean(P_0T), val = P_ts[1])
-  return(valu)
+  val <- list(sim = mean(P_0T), val = P_ts[1])
+  return(val)
   
 }
 
@@ -110,8 +116,7 @@ prix_zc_mc <- function(rate, Tz = 5){#Compare price of zero coupon evaluate by m
 taux <- taux_ZC()
 monte <- floating_coupon(taux$taux_zc, taux$rate)
 matplot(taux$rate,type="l")
-compar <- prix_zc_mc(taux$rate,5)
+compar <- prix_zc_mc(taux$rate,1)
 error_zc <- abs(compar$sim-compar$val)
 monte$pri
 error_zc
-
